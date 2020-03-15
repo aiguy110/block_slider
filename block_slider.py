@@ -1,16 +1,36 @@
 import numpy as np
+import itertools
 
-BLOCKS = 10
+BLOCKS = 11
 init_grid = np.array([[2, 1, 1, 3],
                       [2, 1, 1, 3],
                       [4, 5, 5, 6],
-                      [4, 7, 8, 6],
+                      [4, 7, 8, 11],
                       [9, 0, 0, 10]], dtype=np.int32)
-win = lambda g: g[4, 1]==1 and g[4, 2]==1 
+equivalencies = [(2, 3, 4), (9, 6, 7, 8, 10, 11)]
+win = lambda g: g[4, 1]==1 and g[4, 2]==1
+
+
+# BLOCKS = 10
+# init_grid = np.array([[2, 1, 1, 3],
+#                       [2, 1, 1, 3],
+#                       [4, 5, 5, 6],
+#                       [4, 7, 8, 6],
+#                       [9, 0, 0, 10]], dtype=np.int32)
+# equivalencies = [(2, 3, 4, 6), (9, 7, 8, 10)]
+# win = lambda g: g[4, 1]==1 and g[4, 2]==1
+
+# BLOCKS = 3
+# init_grid = np.array([[1, 2],
+#                       [1, 0],
+#                       [3, 0]], dtype=np.int32)
+# equivalencies = [(2, 3)]
+# win = lambda g: g[2, 1]==1
 
 # BLOCKS = 2
 # init_grid = np.array([[1, 0],
 #                       [0, 2]], dtype=np.int32)
+# equivalencies = []
 # win = lambda g: g[1, 1]==1
 
 ROWS= len(init_grid)
@@ -47,6 +67,30 @@ def move(grid, block, direction):
                 new_grid[i, j] = grid[i, j]
     return new_grid
 
+def equiv_grids(grid):
+    global equivalencies, ROWS, COLS, BLOCKS
+    grids = []
+    for equivilance in itertools.product(*[list(itertools.permutations(eq)) for eq in equivalencies]):
+        block_map = {0: 0}
+        for block in range(1, BLOCKS+1):
+            for e, eq in enumerate(equivalencies):
+                if block in eq:
+                    block_map[block] = equivalencies[e][equivilance[e].index(block)]
+                    break
+            else:
+                block_map[block] = block
+        
+        new_grid = np.zeros((ROWS, COLS), dtype=np.int32)
+        for i in range(ROWS):
+            for j in range(COLS):
+                new_grid[i, j] = block_map[ grid[i, j] ]
+        grids.append(new_grid)
+    
+    if len(grids) == 0:
+        return [grid]
+    else:
+        return grids
+
 def solve(init_grid):
     global BLOCKS
     checked_grid_hashes = {}
@@ -64,7 +108,7 @@ def solve(init_grid):
                 best_partial_solution_cost = len(partial_solution[0])
         if best_partial_solution_cost > current_depth:
             current_depth = best_partial_solution_cost
-            print('Current depth:', current_depth, ', Edge nodes:',len(edge_solutions), end='\r')
+            print('Current depth:', current_depth, ', Edge nodes:', len(edge_solutions), ', Hash table length:', len(checked_grid_hashes))
 
         move_hist, grid = edge_solutions[best_partial_solution_ind]
         next_partial_solutions = []
@@ -82,7 +126,8 @@ def solve(init_grid):
                     return move_hist + [(block, direction)]
                 
                 # Add next moves to list of moves to consider
-                checked_grid_hashes[ hash(str(new_grid)) ] = True
+                for equiv_grid in equiv_grids(new_grid):
+                    checked_grid_hashes[ hash(str(equiv_grid)) ] = True
                 next_partial_solutions.append( (move_hist + [(block, direction)], new_grid) )
             
         # We apparently didn't find a win. Update edge_solutions
@@ -97,10 +142,15 @@ def solve(init_grid):
     # We can't win from here :(
     return None
 
+
+# print('equiv_grids')
+# for grid in equiv_grids(init_grid):
+#     print(grid) 
+
 result = solve(init_grid)
+print()
 print('MOVES:', len(result))
 print(init_grid)
 for move in result:
-    print('   |')
-    print('   V')
-    print(move)
+    dir_str = ['RIGHT', 'DOWN', 'LEFT', 'UP'][move[1]]
+    print(f'Move block {move[0]} {dir_str}')
